@@ -4,17 +4,17 @@ try:
     import json
 except ImportError:
     import simplejson as json
-import urllib2
-import urllib
+
 import base64
+import urllib.request, urllib.error, urllib.parse
 
 from pagerduty.version import *
 
 __version__ = VERSION
 
-class SchedulesError(urllib2.HTTPError):
+class SchedulesError(urllib.error.HTTPError):
     def __init__(self, http_error):
-        urllib2.HTTPError.__init__(self, http_error.filename, http_error.code, http_error.msg, http_error.hdrs, http_error.fp)
+        urllib.error.HTTPError.__init__(self, http_error.filename, http_error.code, http_error.msg, http_error.hdrs, http_error.fp)
 
         try:
             data = self.read()
@@ -33,7 +33,7 @@ class SchedulesError(urllib2.HTTPError):
     def __str__(self):
         return self.__repr__()
 
-class SchedulesRequest(urllib2.Request):
+class SchedulesRequest(urllib.request.Request):
     def __init__(self, connection, resource, params):
         """Representation of a Pagerduty Schedules API HTTP request.
         
@@ -48,9 +48,9 @@ class SchedulesRequest(urllib2.Request):
         
         """
 
-        encoded_params = urllib.urlencode(params)
+        encoded_params = urllib.parse.urlencode(params)
         url = connection.base_url + resource + '?' + encoded_params
-        urllib2.Request.__init__(self, url)
+        urllib.request.Request.__init__(self, url)
 
         # Add auth header
         base64string = base64.encodestring('%s:%s' % (connection.username, connection.password)).replace('\n','')
@@ -64,8 +64,8 @@ class SchedulesRequest(urllib2.Request):
     def fetch(self):
         """Execute the request."""
         try:
-            response = urllib2.urlopen(self)
-        except urllib2.HTTPError, e:
+            response = urllib.request.urlopen(self)
+        except urllib.error.HTTPError as e:
             raise SchedulesError(e)
         else:
             return SchedulesResponse(response)
@@ -84,7 +84,7 @@ class SchedulesResponse(object):
 
 
     def __repr__(self):
-        return 'SchedulesResponse: {0}'.format(self.content.items())
+        return 'SchedulesResponse: {0}'.format(list(self.content.items()))
 
 class Schedules(object):
     """ Interface to Pagerduty Schedule API.
@@ -159,18 +159,20 @@ class PagerDuty(object):
             "service_key": self.service_key,
             "event_type": event_type,
         }
-        for k, v in kwargs.items():
+        for k, v in list(kwargs.items()):
             if v is not None:
                 event[k] = v
         encoded_event = json.dumps(event)
         try:
-            res = urllib2.urlopen(self.api_endpoint, encoded_event, self.timeout)
-        except urllib2.HTTPError, exc:
+            res = urllib.request.urlopen(self.api_endpoint, encoded_event.encode("UTF-8"), self.timeout)
+        except urllib.error.HTTPError as exc:
             if exc.code != 400:
                 raise
             res = exc
         
-        result = json.loads(res.read())
+        dataString = res.read().decode("UTF-8")
+
+        result = json.loads(dataString)
         
         if result['status'] != "success":
             raise PagerDutyException(result['status'], result['message'], result['errors'])
@@ -179,9 +181,9 @@ class PagerDuty(object):
         
         return result.get('incident_key')
 
-class IncidentsError(urllib2.HTTPError):
+class IncidentsError(urllib.error.HTTPError):
     def __init__(self, http_error):
-        urllib2.HTTPError.__init__(self, http_error.filename, http_error.code, http_error.msg, http_error.hdrs, http_error.fp)
+        urllib.error.HTTPError.__init__(self, http_error.filename, http_error.code, http_error.msg, http_error.hdrs, http_error.fp)
 
         self.statuscode = http_error.code
         self.statusdesc = http_error.msg
@@ -204,7 +206,7 @@ class IncidentsError(urllib2.HTTPError):
     def __str__(self):
         return self.__repr__()
 
-class IncidentsRequest(urllib2.Request):
+class IncidentsRequest(urllib.request.Request):
     def __init__(self, connection, params):
         """Representation of a Pagerduty Incidents API HTTP request.
 
@@ -216,9 +218,9 @@ class IncidentsRequest(urllib2.Request):
 
         """
 
-        encoded_params = urllib.urlencode(params)
+        encoded_params = urllib.parse.urlencode(params)
         url = connection.base_url + '?' + encoded_params
-        urllib2.Request.__init__(self, url)
+        urllib.request.Request.__init__(self, url)
 
         # Add auth header
         base64string = base64.encodestring('%s:%s' % (connection.username, connection.password)).replace('\n','')
@@ -230,8 +232,8 @@ class IncidentsRequest(urllib2.Request):
     def fetch(self):
         """Execute the request."""
         try:
-            response = urllib2.urlopen(self)
-        except urllib2.HTTPError, e:
+            response = urllib.request.urlopen(self)
+        except urllib.error.HTTPError as e:
             raise IncidentsError(e)
         else:
             return IncidentsResponse(response)
@@ -248,7 +250,7 @@ class IncidentsResponse(object):
             raise IncidentsError(self.content)
 
     def __repr__(self):
-        return 'IncidentsResponse: {0}'.format(self.content.items())
+        return 'IncidentsResponse: {0}'.format(list(self.content.items()))
 
 class Incidents(object):
     """ Interface to Pagerduty Incident API.
